@@ -41,8 +41,8 @@ protected:
 protected:
 	DECLARE_MESSAGE_MAP()
 private:
-	CArray<CPoint, CPoint> PolygonPoints;
-	CArray<CPoint, CPoint> PointsBuffer;
+	CArray<CPoint, CPoint&> PolygonPoints;
+	CArray<CPoint, CPoint&> PointsBuffer;
 public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
@@ -53,18 +53,24 @@ private:
 	CPoint LineEndPoint;
 	int DrawType = 0;
 	bool StartMove = false;
+	int TimerID;
 public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
-	static const int DENSITY = 1000;
+	static const int DENSITY = 500;
 private:
 	//void GetBezierPoints(CPoint* result,int index, int density = CJLUCG06View::DENSITY);
 	//CPoint Decas(double t,int index);
 	void GetBezierPoints(CPoint* source, int n, CPoint* result, int density = CJLUCG06View::DENSITY);
 	CPoint Decas(CPoint* source, int n, double t);
-	void DrawCurves();
+	void DrawCurves(COLORREF color);
+	bool* IsOpposite = nullptr;
+	bool FinishDrawPolygon = false;
 public:
 	afx_msg void OnButtonstart();
 	afx_msg void OnButtonstop();
+private:
+	// 将PolygonPoints点的下标转化为逻辑坐标
+	int GetIndex(int i);
 };
 
 #ifndef _DEBUG  // JLUCG06View.cpp 中的调试版本
