@@ -40,11 +40,14 @@ END_MESSAGE_MAP()
 CJLUCG06View::CJLUCG06View() noexcept
 {
 	// TODO: 在此处添加构造代码
-
+	IsOpposite = new int[CJLUCG06View::DENSITY];
+	for (int i = 0; i < CJLUCG06View::DENSITY; i++)
+		IsOpposite[i] = 0;
 }
 
 CJLUCG06View::~CJLUCG06View()
 {
+	delete IsOpposite;
 }
 
 BOOL CJLUCG06View::PreCreateWindow(CREATESTRUCT& cs)
@@ -68,21 +71,33 @@ void CJLUCG06View::OnDraw(CDC* pDC)
 
 void CJLUCG06View::OnTimer(UINT_PTR nIDEvent)
 {
+
 	if (StartMove) {
 		//清除上一个多边形和封闭内切曲线
+		for (int i = 0; i < CJLUCG06View::DENSITY; i++)
+			IsOpposite[i] = 0;
+		CDC* pDC = this->GetDC();
+		pDC->SetROP2(R2_NOT);
+		pDC->MoveTo(PolygonPoints[0]);
+		int n = PolygonPoints.GetCount();
+		for (int i = 1; i < n; i++) {
+			pDC->LineTo(PolygonPoints[i]);
+		}
+		pDC->LineTo(PolygonPoints[0]);//重画上一次的多边形
+		pDC->SetROP2(R2_WHITE);
+		DrawCurves(pDC, RGB(0,0,0));//重画上一次的曲线
 		this->Invalidate();
 		PointsBuffer.RemoveAll();
 		CRect rect;
 		this->GetClientRect(rect);
-		int n = PolygonPoints.GetCount();
 		int Result;
 		
 		for (int i = 0; i < n; i = i + 4) {//奇数编号水平运动
-			if (!IsOpposite[i]) {//向右
+			if (IsOpposite[i] == 0) {//向右
 				Result = PolygonPoints[i].x + 3 * GetIndex(i);
 				if (rect.right < Result) {
 					PolygonPoints[i].x = rect.right + rect.right - Result;
-					IsOpposite[i] = true;
+					IsOpposite[i] = 1;
 				}
 				else {
 					PolygonPoints[i].x = Result;
@@ -92,7 +107,7 @@ void CJLUCG06View::OnTimer(UINT_PTR nIDEvent)
 				Result = PolygonPoints[i].x - 3 * GetIndex(i);
 				if (rect.left > Result) {
 					PolygonPoints[i].x = rect.left + rect.left - Result;
-					IsOpposite[i] = false;
+					IsOpposite[i] = 0;
 				}
 				else {
 					PolygonPoints[i].x = Result;
@@ -100,11 +115,11 @@ void CJLUCG06View::OnTimer(UINT_PTR nIDEvent)
 			}
 		}
 		for (int i = 2; i < n; i = i + 4) {//偶数编号垂直运动
-			if (!IsOpposite[i]) {//向下
+			if (IsOpposite[i] == 0) {//向下
 				Result = PolygonPoints[i].y + 3 * GetIndex(i);
 				if (rect.bottom < Result) {
 					PolygonPoints[i].y = rect.bottom + rect.bottom - Result;
-					IsOpposite[i] = true;
+					IsOpposite[i] = 1;
 				}
 				else {
 					PolygonPoints[i].y = Result;
@@ -114,16 +129,24 @@ void CJLUCG06View::OnTimer(UINT_PTR nIDEvent)
 				Result = PolygonPoints[i].y - 3 * GetIndex(i);
 				if (rect.top > Result) {
 					PolygonPoints[i].y = rect.top + rect.top - Result;
-					IsOpposite[i] = false;
+					IsOpposite[i] = 0;
 				}
 				else {
 					PolygonPoints[i].y = Result;
 				}
 			}
 		}
-		DrawCurves(RGB(255, 0, 0));
+		pDC->SetROP2(R2_BLACK);
+		pDC->MoveTo(PolygonPoints[0]);
+		for (int i = 0; i < n; i++) {
+			pDC->LineTo(PolygonPoints[i]);
+		}
+		pDC->LineTo(PolygonPoints[0]);//画本次多边形和曲线
+		ReleaseDC(pDC);
+		pDC = this->GetDC();
+		DrawCurves(pDC, RGB(255, 0, 0));
 		PointsBuffer.RemoveAll();
-		delete IsOpposite;
+		ReleaseDC(pDC);
 	}
 	CView::OnTimer(nIDEvent);
 }
@@ -158,19 +181,19 @@ void CJLUCG06View::OnLButtonDblClk(UINT nFlags, CPoint point)
 	pDC->MoveTo(LineStartPoint);
 	pDC->LineTo(LineEndPoint);
 	DrawType = 0;
-	ReleaseDC(pDC);
+
 	PolygonPoints.Copy(PointsBuffer);
 	PointsBuffer.RemoveAll();
-	DrawCurves(RGB(255, 0, 0));
+	DrawCurves(pDC, RGB(255, 0, 0));
+	ReleaseDC(pDC);
 	PolygonPoints.Copy(PointsBuffer);
 	PointsBuffer.RemoveAll();
 	FinishDrawPolygon = true;
 	CView::OnLButtonDblClk(nFlags, point);
 }
 
-void CJLUCG06View::DrawCurves(COLORREF color)
+void CJLUCG06View::DrawCurves(CDC* pDC, COLORREF color)
 {
-	CDC* pDC = GetDC();
 	int n = PolygonPoints.GetCount();
 	CPoint mid;
 	for (int i = 0; i < n; i++) {
@@ -183,22 +206,25 @@ void CJLUCG06View::DrawCurves(COLORREF color)
 	CPoint* result = new CPoint[CJLUCG06View::DENSITY + 1];
 	CPoint* source = new CPoint[3];
 	int nn = 2 * n;
-	IsOpposite = new bool[nn];//true代表反向运动，false代表正向运动
-	for (int i = 0; i < nn; i++) {
-		IsOpposite[i] = false;
-	}
-	for (int j = 1; j < nn; j = j + 2) {
-		source[0] = PointsBuffer[j % nn];
-		source[1] = PointsBuffer[(j + 1) % nn];
-		source[2] = PointsBuffer[(j + 2) % nn];
+	
+	for (int j = 1; j < nn - 2; j = j + 2) {
+		source[0] = PointsBuffer[j];
+		source[1] = PointsBuffer[j + 1];
+		source[2] = PointsBuffer[j + 2];
 		GetBezierPoints(source, 2, result);
 		for (int i = 0; i <= CJLUCG06View::DENSITY; i++) {
 			pDC->SetPixel(result[i], color);
 		}
 	}
+	source[0] = PointsBuffer[nn - 1];
+	source[1] = PointsBuffer[0];
+	source[2] = PointsBuffer[1];
+	GetBezierPoints(source, 2, result);
+	for (int i = 0; i <= CJLUCG06View::DENSITY; i++) {
+		pDC->SetPixel(result[i], color);
+	}
 	delete result;
 	delete source;
-	ReleaseDC(pDC);
 }
 
 void CJLUCG06View::OnLButtonDown(UINT nFlags, CPoint point)
@@ -237,23 +263,24 @@ void CJLUCG06View::OnMouseMove(UINT nFlags, CPoint point)
 
 void CJLUCG06View::OnButtonstart()
 {
-	int n = PolygonPoints.GetCount();
+	/*int n = PolygonPoints.GetCount();
 	if (n > 0) {
 		StartMove = true;
 		this->TimerID = SetTimer(1, 50, NULL);
-		
+		for (int i = 0; i < CJLUCG06View::DENSITY; i++)
+			IsOpposite[i] = 0;
 		if (FinishDrawPolygon) {
-			CDC* pDC = this->GetDC();
 			pDC->SetROP2(R2_NOTXORPEN);
 			pDC->MoveTo(PolygonPoints[0]);
 			for (int i = 1; i < n; i++) {
 				pDC->LineTo(PolygonPoints[i]);
 			}
 			pDC->LineTo(PolygonPoints[0]);
-			ReleaseDC(pDC);
 			FinishDrawPolygon = false;
 		}
-	}
+	}*/
+    StartMove = true;
+	SetTimer(1, 50, NULL);
 }
 
 
@@ -262,7 +289,6 @@ void CJLUCG06View::OnButtonstop()
 	if (StartMove) {
 		StartMove = false;
 		KillTimer(this->TimerID);
-		//delete IsOpposite;
 	}
 }	
 

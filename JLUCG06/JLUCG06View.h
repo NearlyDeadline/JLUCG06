@@ -62,8 +62,8 @@ private:
 	//CPoint Decas(double t,int index);
 	void GetBezierPoints(CPoint* source, int n, CPoint* result, int density = CJLUCG06View::DENSITY);
 	CPoint Decas(CPoint* source, int n, double t);
-	void DrawCurves(COLORREF color);
-	bool* IsOpposite = nullptr;
+	void DrawCurves(CDC* pDC, COLORREF color);
+	int* IsOpposite = nullptr;
 	bool FinishDrawPolygon = false;
 public:
 	afx_msg void OnButtonstart();
